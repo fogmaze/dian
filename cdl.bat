@@ -1,12 +1,12 @@
 @echo off
 setlocal
 
-set "ZIP_URL=https://github.com/fogmaze/dian/releases/latest/download/Dian.tar.gz"
+set "ZIP_URL=https://github.com/fogmaze/dian/releases/latest/download/dian.zip"
 
 rem Convert the batch-file directory into a path without trailing backslash
 for %%I in ("%~dp0.") do set "BASE_DIR=%%~fI"
 
-set "ZIP_FILE=%BASE_DIR%\Dian.tar.gz"
+set "ZIP_FILE=%BASE_DIR%\Dian.zip"
 
 echo.
 echo [1/3] Downloading...
@@ -31,7 +31,7 @@ if not exist "%ZIP_FILE%" (
 echo.
 echo [2/3] Extracting...
 
-tar.exe -xzf "%ZIP_FILE%" -C "%BASE_DIR%"
+tar.exe -xf "%ZIP_FILE%" -C "%BASE_DIR%"
 
 if errorlevel 1 (
     echo [ERROR] Extraction failed.
