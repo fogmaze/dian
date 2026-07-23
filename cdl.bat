@@ -1,19 +1,19 @@
-```bat
 @echo off
 setlocal
 
 set "ZIP_URL=https://github.com/fogmaze/dian/releases/latest/download/dian.zip"
 
-rem Directory containing this batch file
-set "BASE_DIR=%~dp0"
+rem Convert the batch-file directory into a path without trailing backslash
+for %%I in ("%~dp0.") do set "BASE_DIR=%%~fI"
 
-rem Downloaded ZIP path
-set "ZIP_FILE=%BASE_DIR%Dian.zip"
+set "ZIP_FILE=%BASE_DIR%\Dian.zip"
 
 echo.
 echo [1/3] Downloading...
 
-curl.exe -L --fail --retry 3 -o "%ZIP_FILE%" "%ZIP_URL%"
+curl.exe -L --fail --retry 3 --retry-delay 2 ^
+    -o "%ZIP_FILE%" ^
+    "%ZIP_URL%"
 
 if errorlevel 1 (
     echo [ERROR] Download failed.
@@ -44,18 +44,19 @@ del /q "%ZIP_FILE%" >nul 2>&1
 echo.
 echo [3/3] Running init.bat...
 
-if exist "%BASE_DIR%Dian\init.bat" (
-    call "%BASE_DIR%Dian\init.bat"
-    exit /b
+if exist "%BASE_DIR%\Dian\init.bat" (
+    call "%BASE_DIR%\Dian\init.bat"
+    exit /b %errorlevel%
 )
 
-if exist "%BASE_DIR%init.bat" (
-    call "%BASE_DIR%init.bat"
-    exit /b
+if exist "%BASE_DIR%\init.bat" (
+    call "%BASE_DIR%\init.bat"
+    exit /b %errorlevel%
 )
 
 echo [ERROR] init.bat was not found.
+echo Checked:
+echo   "%BASE_DIR%\Dian\init.bat"
+echo   "%BASE_DIR%\init.bat"
 pause
 exit /b 1
-```
-
