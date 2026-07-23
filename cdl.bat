@@ -2,7 +2,7 @@
 @echo off
 setlocal
 
-set "ZIP_URL=https://github.com/fogmaze/dian/releases/latest/download/Dian.zip"
+set "ZIP_URL=https://github.com/fogmaze/dian/releases/latest/download/dian.zip"
 
 rem Directory containing this batch file
 set "BASE_DIR=%~dp0"
