@@ -6,7 +6,7 @@ set "ZIP_URL=https://github.com/fogmaze/dian/releases/latest/download/Dian.tar.g
 rem Convert the batch-file directory into a path without trailing backslash
 for %%I in ("%~dp0.") do set "BASE_DIR=%%~fI"
 
-set "ZIP_FILE=%BASE_DIR%\Dian.zip"
+set "ZIP_FILE=%BASE_DIR%\Dian.tar.gz"
 
 echo.
 echo [1/3] Downloading...
