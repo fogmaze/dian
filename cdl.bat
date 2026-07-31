@@ -21,7 +21,6 @@ echo Copying installer to the local computer...
 copy /y "%~f0" "%LOCAL_BAT%" >nul 2>&1
 
 if errorlevel 1 goto COPY_FAILED
-
 if not exist "%LOCAL_BAT%" goto COPY_FAILED
 
 
@@ -102,11 +101,30 @@ echo You can now remove the USB drive.
 echo ============================================================
 echo.
 
+
+rem ============================================================
+rem Download settings
+rem ============================================================
+
 set "ZIP_URL=https://github.com/fogmaze/dian/releases/latest/download/dian.zip"
 
 rem Download and extract to the current user's Desktop
 set "BASE_DIR=%USERPROFILE%\Desktop"
 set "ZIP_FILE=%BASE_DIR%\Dian.zip"
+set "PART_FILE=%BASE_DIR%\Dian.zip.part"
+
+rem Number of retries after the first attempt
+set "DOWNLOAD_MAX_RETRIES=5"
+
+rem Delay between retries, in seconds
+set "DOWNLOAD_RETRY_DELAY=5"
+
+set /a DOWNLOAD_MAX_ATTEMPTS=DOWNLOAD_MAX_RETRIES+1
+
+
+rem ============================================================
+rem Check required directories and commands
+rem ============================================================
 
 if not exist "%BASE_DIR%" (
     echo [ERROR] Desktop directory was not found:
@@ -131,25 +149,131 @@ if errorlevel 1 (
 echo Download directory:
 echo   "%BASE_DIR%"
 
-echo.
-echo [1/3] Downloading...
+
+rem ============================================================
+rem Remove files left by an older completed installation
+rem ============================================================
 
 if exist "%ZIP_FILE%" (
     del /q "%ZIP_FILE%" >nul 2>&1
 )
 
-curl.exe -L --fail --retry 3 --retry-delay 2 ^
-    -o "%ZIP_FILE%" ^
+rem Keep an existing .part file so that a previously interrupted
+rem installation can also continue downloading.
+rem
+rem Delete the following file manually if you want to restart
+rem the download completely:
+rem   %PART_FILE%
+
+
+rem ============================================================
+rem Download with retry and resume support
+rem ============================================================
+
+echo.
+echo [1/3] Downloading...
+
+set /a DOWNLOAD_ATTEMPT=0
+
+
+:DOWNLOAD_RETRY
+
+set /a DOWNLOAD_ATTEMPT+=1
+
+echo.
+echo ------------------------------------------------------------
+echo Download attempt %DOWNLOAD_ATTEMPT% of %DOWNLOAD_MAX_ATTEMPTS%
+echo ------------------------------------------------------------
+echo.
+
+curl.exe -L ^
+    --fail ^
+    --show-error ^
+    --connect-timeout 30 ^
+    --speed-limit 1024 ^
+    --speed-time 60 ^
+    --continue-at - ^
+    -o "%PART_FILE%" ^
     "%ZIP_URL%"
+
+set "CURL_RESULT=%errorlevel%"
+
+if "%CURL_RESULT%"=="0" goto DOWNLOAD_FINISHED
+
+
+rem ============================================================
+rem Download attempt failed
+rem ============================================================
+
+echo.
+echo [WARNING] Download attempt %DOWNLOAD_ATTEMPT% failed.
+echo curl.exe returned error code %CURL_RESULT%.
+
+
+rem curl error 33 means the server did not accept resume requests.
+rem Delete the partial file so the next attempt starts from zero.
+
+if "%CURL_RESULT%"=="33" (
+    echo.
+    echo The server did not accept the resume request.
+    echo The next attempt will restart the download from zero.
+
+    if exist "%PART_FILE%" (
+        del /q "%PART_FILE%" >nul 2>&1
+    )
+)
+
+
+rem Stop after all attempts have been used.
+
+if %DOWNLOAD_ATTEMPT% GEQ %DOWNLOAD_MAX_ATTEMPTS% goto DOWNLOAD_FAILED
+
+
+echo.
+echo Retrying in %DOWNLOAD_RETRY_DELAY% seconds...
+echo The incomplete download will be resumed if possible.
+
+timeout /t %DOWNLOAD_RETRY_DELAY% /nobreak >nul
+
+goto DOWNLOAD_RETRY
+
+
+rem ============================================================
+rem Download completed
+rem ============================================================
+
+:DOWNLOAD_FINISHED
+
+if not exist "%PART_FILE%" (
+    echo.
+    echo [ERROR] The downloaded file was not created:
+    echo   "%PART_FILE%"
+    exit /b 1
+)
+
+for %%A in ("%PART_FILE%") do set "DOWNLOADED_SIZE=%%~zA"
+
+if "%DOWNLOADED_SIZE%"=="0" (
+    echo.
+    echo [ERROR] The downloaded file is empty:
+    echo   "%PART_FILE%"
+
+    del /q "%PART_FILE%" >nul 2>&1
+
+    exit /b 1
+)
+
+move /y "%PART_FILE%" "%ZIP_FILE%" >nul 2>&1
 
 if errorlevel 1 (
     echo.
-    echo [ERROR] Download failed.
-
-    if exist "%ZIP_FILE%" (
-        del /q "%ZIP_FILE%" >nul 2>&1
-    )
-
+    echo [ERROR] Failed to rename the completed download.
+    echo.
+    echo Source:
+    echo   "%PART_FILE%"
+    echo.
+    echo Destination:
+    echo   "%ZIP_FILE%"
     exit /b 1
 )
 
@@ -159,6 +283,44 @@ if not exist "%ZIP_FILE%" (
     echo   "%ZIP_FILE%"
     exit /b 1
 )
+
+echo.
+echo Download completed successfully.
+echo Downloaded size: %DOWNLOADED_SIZE% bytes
+
+
+rem ============================================================
+rem All download attempts failed
+rem ============================================================
+
+goto EXTRACT_ARCHIVE
+
+
+:DOWNLOAD_FAILED
+
+echo.
+echo ============================================================
+echo [ERROR] Download failed after %DOWNLOAD_MAX_ATTEMPTS% attempts.
+echo ============================================================
+echo.
+echo URL:
+echo   "%ZIP_URL%"
+echo.
+echo Partial download:
+echo   "%PART_FILE%"
+echo.
+echo The partial file has been kept.
+echo Run this installer again to continue the download.
+echo.
+
+exit /b %CURL_RESULT%
+
+
+rem ============================================================
+rem Extract archive
+rem ============================================================
+
+:EXTRACT_ARCHIVE
 
 echo.
 echo [2/3] Extracting...
@@ -171,10 +333,20 @@ if errorlevel 1 (
     echo.
     echo ZIP file:
     echo   "%ZIP_FILE%"
+    echo.
+    echo The downloaded ZIP may be incomplete or damaged.
+    echo Delete the following files and run the installer again:
+    echo   "%ZIP_FILE%"
+    echo   "%PART_FILE%"
     exit /b 1
 )
 
 del /q "%ZIP_FILE%" >nul 2>&1
+
+
+rem ============================================================
+rem Find and run init.bat
+rem ============================================================
 
 echo.
 echo [3/3] Running init.bat...
